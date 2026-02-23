@@ -15,6 +15,7 @@ const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
 const basicAuth = require("express-basic-auth");
 
+// swagger config
 const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
@@ -42,6 +43,7 @@ const swaggerOptions = {
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
+// protect swagger
 app.use(
   "/api-docs",
   basicAuth({
