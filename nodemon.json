@@ -1,0 +1,11 @@
+{
+    "env": {
+        "NODE_ENV": "development",
+        "PORT": 3000,
+        "MONGO_USERNAME": "henddiab132_db",
+        "MONGO_PASSWORD": "EAhW2pqZEFWoAQqK",
+        "MONGO_DB": "taskManager",
+        "TOKEN_SECRET": "secretkey",
+        "REFRESH_TOKEN_SECRET": "refreshsecretkey"
+    }
+}

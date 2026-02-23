@@ -2,62 +2,39 @@
 const express = require("express");
 const app = express();
 
+// fs
+const fs = require("fs");
+
+// path
+const path = require("path");
+
+const https = require("https");
+const privateKey = fs.readFileSync("private.key");
+const certificate = fs.readFileSync("certificate.crt");
+
+
 // mongoose
 const mongoose = require("mongoose");
+
+const helmet = require("helmet");
+const compression = require("compression");
+const morgan = require("morgan");
+
+// create a write stream (in append mode) for logging
+const accessLogStream = fs.createWriteStream(
+  path.join(__dirname, "access.log"),
+  { flags: "a" },
+);
+
+
+app.use(compression());
+app.use(helmet());
+app.use(morgan("combined", { stream: accessLogStream }));
 
 // use body parser to parse request body
 const bodyParser = require("body-parser");
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-// swagger
-const swaggerUi = require("swagger-ui-express");
-const swaggerJsdoc = require("swagger-jsdoc");
-const basicAuth = require("express-basic-auth");
-
-// swagger config
-const swaggerOptions = {
-  definition: {
-    openapi: "3.0.0",
-    info: {
-      title: "Task Manager API",
-      version: "1.0.0"
-    },
-    servers: [
-      {
-        url: "https://your-render-url.onrender.com"
-      }
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "JWT"
-        }
-      }
-    }
-  },
-  apis: ["./routes/*.js"]
-};
-
-const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
-// protect swagger
-app.use(
-  "/api-docs",
-  basicAuth({
-    users: {
-      [process.env.SWAGGER_USER]: process.env.SWAGGER_PASS
-    },
-    challenge: true
-  }),
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec)
-);
-
-// path
-const path = require("path");
 
 // Reads multipart/form-data
 // Extracts files from incoming requests
@@ -120,12 +97,14 @@ app.use("/", taskRoutes);
 const userRoutes = require("./routes/user.route");
 app.use("/", userRoutes);
 
+
 // connect to mongo database
 mongoose
   .connect(
-    "mongodb+srv://henddiab132_db:EAhW2pqZEFWoAQqK@cluster0.h7kobbz.mongodb.net/taskManager",
+    `mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@cluster0.h7kobbz.mongodb.net/${process.env.MONGO_DB}`,
   )
   .then((res) => {
-    app.listen(3000);
+    // https.createServer({ key: privateKey, cert: certificate }, app).listen(process.env.PORT);
+    app.listen(process.env.PORT);
   })
-  .catch((err) => {});
+  .catch((err) => { });
