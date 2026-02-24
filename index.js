@@ -104,6 +104,10 @@ app.use("/", taskRoutes);
 const userRoutes = require("./routes/user.route");
 app.use("/", userRoutes);
 
+// register log routes
+const logRoutes = require("./routes/log.route");
+app.use("/", logRoutes);
+
 
 // connect to mongo database
 mongoose
