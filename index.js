@@ -68,6 +68,13 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+const imageDir = path.join(__dirname, "images");
+
+// Create folder if it doesn't exist
+if (!fs.existsSync(imageDir)) {
+  fs.mkdirSync(imageDir, { recursive: true });
+}
+
 // register multer
 // Handles single file uploads
 // Expects the file field to be named "image" : <input type="file" name="image" />
