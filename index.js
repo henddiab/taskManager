@@ -5,12 +5,18 @@ const app = express();
 // fs
 const fs = require("fs");
 
+const jwt = require("jsonwebtoken");
+
 // path
 const path = require("path");
 
 const https = require("https");
 const privateKey = fs.readFileSync("private.key");
 const certificate = fs.readFileSync("certificate.crt");
+
+const { graphqlHTTP } = require("express-graphql");
+const schema = require("./graphql/schema");
+const rootValue = require("./graphql/resolvers");
 
 
 // mongoose
@@ -27,9 +33,45 @@ const accessLogStream = fs.createWriteStream(
 );
 
 
-app.use(compression());
-app.use(helmet());
-app.use(morgan("combined", { stream: accessLogStream }));
+// app.use(compression());
+// app.use(helmet());
+// app.use(morgan("combined", { stream: accessLogStream }));
+
+// graphql config
+app.use(
+  "/graphql",
+  graphqlHTTP(async (req, res) => {
+
+    let userId = null;
+    let role = null;
+
+    const authHeader = req.get("Authorization");
+
+    if (authHeader) {
+      const token = authHeader.split(" ")[1];
+
+      try {
+        const decoded = jwt.verify(token, "secretkey");
+
+        userId = decoded.userId;
+        role = decoded.role;
+
+      } catch (err) {
+        console.log("Invalid token");
+      }
+    }
+
+    return {
+      schema: schema,
+      rootValue: rootValue,
+      graphiql: true,
+      context: {
+        userId,
+        role
+      }
+    };
+  })
+);
 
 // use body parser to parse request body
 const bodyParser = require("body-parser");
@@ -106,6 +148,7 @@ app.use("/", userRoutes);
 
 // register log routes
 const logRoutes = require("./routes/log.route");
+const isAuth = require("./middleware/is-auth");
 app.use("/", logRoutes);
 
 
