@@ -1,15 +1,15 @@
 exports.withAuth = (resolver) => {
-    return (args, context) => {
+    return (parent, args, context) => {
         if (!context.userId) {
             throw new Error("Not authenticated");
         }
 
-        return resolver(args, context);
+        return resolver(parent, args, context);
     };
 };
 
 exports.withRole = (role, resolver) => {
-    return (args, context) => {
+    return (parent, args, context) => {
         if (!context.userId) {
             throw new Error("Not authenticated");
         }
@@ -18,6 +18,6 @@ exports.withRole = (role, resolver) => {
             throw new Error("Not authorized");
         }
 
-        return resolver(args, context);
+        return resolver(parent, args, context);
     };
 };

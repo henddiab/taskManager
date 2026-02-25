@@ -4,8 +4,16 @@ const logResolver = require("./log.resolver");
 const authResolver = require("./auth.resolver");
 
 module.exports = {
-    ...userResolver,
-    ...taskResolver,
-    ...logResolver,
-    ...authResolver,
+    RootQuery: {
+        ...userResolver.Query,
+        ...taskResolver.Query,
+        ...logResolver.Query,
+        ...authResolver.Query,
+    },
+    RootMutation: {
+        ...userResolver.Mutation,
+        ...taskResolver.Mutation,
+        ...logResolver.Mutation,
+        ...authResolver.Mutation,
+    },
 }

@@ -1,167 +1,87 @@
-// express
 const express = require("express");
-const app = express();
-
-// fs
-const fs = require("fs");
-
+const { ApolloServer } = require("apollo-server-express");
+const { graphqlUploadExpress } = require("graphql-upload");
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-
-// path
+const fs = require("fs");
 const path = require("path");
 
-const https = require("https");
-const privateKey = fs.readFileSync("private.key");
-const certificate = fs.readFileSync("certificate.crt");
+// Import your schema and resolvers
+const typeDefs = require("./graphql/schema");
+const resolvers = require("./graphql/resolvers");
 
-const { graphqlHTTP } = require("express-graphql");
-const schema = require("./graphql/schema");
-const rootValue = require("./graphql/resolvers");
+// Import your middlewares & routes
+const errorMiddleware = require("./middleware/error");
+const authRoutes = require("./routes/auth.route");
+const taskRoutes = require("./routes/task.route");
+const userRoutes = require("./routes/user.route");
+const logRoutes = require("./routes/log.route");
 
+// Initialize Express
+const app = express();
 
-// mongoose
-const mongoose = require("mongoose");
+// Serve images folder
+const imageDir = path.join(__dirname, "images");
+if (!fs.existsSync(imageDir)) fs.mkdirSync(imageDir, { recursive: true });
+app.use("/images", express.static(imageDir));
 
-const helmet = require("helmet");
-const compression = require("compression");
-const morgan = require("morgan");
+// Enable GraphQL file uploads
+app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 1 }));
 
-// create a write stream (in append mode) for logging
-const accessLogStream = fs.createWriteStream(
-  path.join(__dirname, "access.log"),
-  { flags: "a" },
-);
+// Body parser for REST routes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+// Register REST routes
+app.use("/auth", authRoutes);
+app.use("/", taskRoutes);
+app.use("/", userRoutes);
+app.use("/", logRoutes);
 
-// app.use(compression());
-// app.use(helmet());
-// app.use(morgan("combined", { stream: accessLogStream }));
+// Register error middleware
+app.use(errorMiddleware);
 
-// graphql config
-app.use(
-  "/graphql",
-  graphqlHTTP(async (req, res) => {
-
+// Apollo Server setup
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  context: ({ req }) => {
+    // Extract JWT token from headers
     let userId = null;
     let role = null;
 
     const authHeader = req.get("Authorization");
-
     if (authHeader) {
       const token = authHeader.split(" ")[1];
-
       try {
-        const decoded = jwt.verify(token, "secretkey");
-
+        const decoded = jwt.verify(token, "secretkey"); // replace with your secret
         userId = decoded.userId;
         role = decoded.role;
-
       } catch (err) {
         console.log("Invalid token");
       }
     }
 
-    return {
-      schema: schema,
-      rootValue: rootValue,
-      graphiql: true,
-      context: {
-        userId,
-        role
-      }
-    };
-  })
-);
-
-// use body parser to parse request body
-const bodyParser = require("body-parser");
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Reads multipart/form-data
-// Extracts files from incoming requests
-// Saves them to disk
-const multer = require("multer");
-
-// control where files will be storaged
-const fileStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // files will be stored on desk /images
-    cb(null, "images");
-  },
-  filename: (req, file, cb) => {
-    // how uploaded files are named
-    cb(
-      null,
-      new Date().toISOString().replace(/:/g, "-") + "-" + file.originalname,
-    );
+    return { userId, role, req };
   },
 });
 
-const fileFilter = (req, file, cb) => {
-  if (
-    file.mimetype === "image/png" ||
-    file.mimetype === "image/jpeg" ||
-    file.mimetype === "image/jpg"
-  ) {
-    cb(null, true); // accept file
-  } else {
-    cb(null, false); // reject file
-  }
-};
+// Start server
+(async () => {
+  await server.start();
+  server.applyMiddleware({ app, path: "/graphql" });
 
-const imageDir = path.join(__dirname, "images");
-
-// Create folder if it doesn't exist
-if (!fs.existsSync(imageDir)) {
-  fs.mkdirSync(imageDir, { recursive: true });
-}
-
-// register multer
-// Handles single file uploads
-// Expects the file field to be named "image" : <input type="file" name="image" />
-app.use(
-  multer({ storage: fileStorage, fileFilter: fileFilter }).single("image"),
-);
-
-// serve static files(images)
-// For every request that starts with /images, use this middleware.
-app.use("/images", express.static(path.join(__dirname, "images")));
-
-// middlewares
-const errorMiddleware = require("./middleware/error");
-
-// register error middleware
-app.use(errorMiddleware);
-
-// register auth routes
-const authRoutes = require("./routes/auth.route");
-app.use("/auth", authRoutes);
-
-// register task routes
-const taskRoutes = require("./routes/task.route");
-app.use("/", taskRoutes);
-
-// register user routes
-const userRoutes = require("./routes/user.route");
-app.use("/", userRoutes);
-
-// register log routes
-const logRoutes = require("./routes/log.route");
-const isAuth = require("./middleware/is-auth");
-app.use("/", logRoutes);
-
-
-// connect to mongo database
-mongoose
-  .connect(
-    `mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@cluster0.h7kobbz.mongodb.net/${process.env.MONGO_DB}`,
-  )
-  .then((res) => {
-    // https.createServer({ key: privateKey, cert: certificate }, app).listen(process.env.PORT);
-    app.listen(process.env.PORT, () => {
+  // Connect to MongoDB
+  mongoose
+    .connect(
+      `mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@cluster0.h7kobbz.mongodb.net/${process.env.MONGO_DB}`,
+    )
+    .then(() => {
+      app.listen(process.env.PORT || 3000, () => {
+        console.log(`Server running at http://localhost:${process.env.PORT || 3000}/graphql`);
+      });
+    })
+    .catch((err) => {
+      console.log("MongoDB connection error:", err);
     });
-  })
-  .catch((err) => {
-    console.log(err);
-  });
+})();
